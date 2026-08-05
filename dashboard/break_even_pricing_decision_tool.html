@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang='es'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Levante Ferries — Break-even Pricing Tool</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f3f7fb;color:#102a43;margin:0;padding:24px}
+.container{max-width:1120px;margin:0 auto}
+.card{background:#fff;border:1px solid #d9e2ec;border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 14px 35px rgba(16,42,67,.08)}
+h1{font-size:40px;letter-spacing:-.04em;margin:0 0 8px}
+p{color:#627d98;line-height:1.5}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+label{font-weight:700;font-size:13px;color:#627d98}
+select,input{width:100%;margin-top:6px}
+select{padding:9px;border:1px solid #d9e2ec;border-radius:9px}
+.kpi{background:#fff;border:1px solid #d9e2ec;border-radius:14px;padding:14px}
+.kpi span{display:block;color:#627d98;font-size:13px}
+.kpi strong{display:block;font-size:25px;margin:6px 0}
+.good{color:#147d64}.warn{color:#b7791f}.bad{color:#b5473a}
+.track{position:relative;height:34px;border-radius:8px;background:#e7edf3}
+.zone{position:absolute;top:0;right:0;bottom:0;background:rgba(118,199,192,.5);border-radius:0 8px 8px 0}
+.threshold{position:absolute;top:-8px;bottom:-8px;width:3px;background:#102a43;transform:translateX(-50%)}
+.current{position:absolute;top:50%;width:18px;height:18px;border:4px solid white;border-radius:50%;background:#168aad;box-shadow:0 0 0 2px #168aad;transform:translate(-50%,-50%)}
+.axis{display:flex;justify-content:space-between;margin-top:10px;color:#627d98;font-size:12px}
+@media(max-width:850px){.grid,.kpis{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class='container'>
+<div class='card'>
+<h1>Break-even Pricing Tool</h1>
+<p>Herramienta de punto de equilibrio para analizar precio, ocupación, elasticidad, costes y margen por ruta.</p>
+</div>
+
+<div class='card grid'>
+<label>Ruta<select id='route'></select></label>
+<label>Cambio de precio <b id='priceValue'></b><input id='priceChange' type='range' min='-25' max='30' step='1' value='0'></label>
+<label>Demanda externa <b id='demandValue'></b><input id='demandFactor' type='range' min='70' max='135' step='1' value='100'></label>
+<label>Capacidad <b id='capacityValue'></b><input id='capacity' type='range' min='100' max='1000' step='10'></label>
+<label>Coste fijo <b id='fixedValue'></b><input id='fixed' type='range' min='5000' max='50000' step='500'></label>
+<label>Coste variable <b id='variableValue'></b><input id='variable' type='range' min='0' max='35' step='0.5'></label>
+<label>Elasticidad <b id='elasticityValue'></b><input id='elasticity' type='range' min='-220' max='-20' step='1'></label>
+</div>
+
+<div class='kpis'>
+<div class='kpi'><span>Precio simulado</span><strong id='simPrice'></strong><small id='priceContext'></small></div>
+<div class='kpi'><span>Ocupación simulada</span><strong id='simOcc'></strong><small id='tickets'></small></div>
+<div class='kpi'><span>Ocupación equilibrio</span><strong id='beOcc'></strong><small id='beSeats'></small></div>
+<div class='kpi'><span>Margen por salida</span><strong id='margin'></strong><small id='marginContext'></small></div>
+</div>
+
+<div class='card'>
+<div style='display:flex;justify-content:space-between;gap:12px;margin-bottom:12px;color:#627d98'>
+<span>Ocupación simulada <b id='currentLabel'></b></span><span>Equilibrio <b id='thresholdLabel'></b></span>
+</div>
+<div class='track'><span class='zone' id='zone'></span><span class='threshold' id='threshold'></span><span class='current' id='current'></span></div>
+<div class='axis'><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+</div>
+
+<div class='card' id='decision'></div>
+</div>
+
+<script>
+const routes = {"Denia-Formentera": {"label": "Denia-Formentera", "capacity": 280.0, "price": 76.69826027397261, "occupancy": 67.86650684931507, "fixed": 13200.0, "variable": 7.0, "elasticity": -0.7787842704803655, "competitor": 75.28746575342466}, "Denia-Ibiza": {"label": "Denia-Ibiza", "capacity": 350.0, "price": 62.07955251141553, "occupancy": 72.69700456621004, "fixed": 14500.0, "variable": 8.0, "elasticity": -0.8358715182808644, "competitor": 60.86378082191781}, "Denia-Mallorca": {"label": "Denia-Mallorca", "capacity": 520.0, "price": 68.50576712328767, "occupancy": 53.32494520547946, "fixed": 22500.0, "variable": 10.0, "elasticity": -0.8471725680014157, "competitor": 67.1667397260274}, "Ibiza-Mallorca": {"label": "Ibiza-Mallorca", "capacity": 300.0, "price": 52.33181735159817, "occupancy": 60.80484931506849, "fixed": 11800.0, "variable": 7.0, "elasticity": -1.0752214418289732, "competitor": 51.39736073059361}, "Valencia-Ibiza": {"label": "Valencia-Ibiza", "capacity": 620.0, "price": 74.19382191780822, "occupancy": 58.57349315068493, "fixed": 25500.0, "variable": 11.0, "elasticity": -0.9541151789924198, "competitor": 72.99857534246576}, "Valencia-Mallorca": {"label": "Valencia-Mallorca", "capacity": 700.0, "price": 66.25688584474885, "occupancy": 58.81749771689498, "fixed": 27500.0, "variable": 12.0, "elasticity": -1.1113700138869098, "competitor": 65.0386301369863}};
+const $ = id => document.getElementById(id);
+const euro = new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0});
+const euro2 = new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2});
+const pct = v => new Intl.NumberFormat('es-ES',{style:'percent',maximumFractionDigits:1,signDisplay:'exceptZero'}).format(v);
+
+function populate(){
+  Object.keys(routes).sort().forEach(key => $('route').add(new Option(routes[key].label, key)));
+}
+
+function loadRoute(){
+  const r = routes[$('route').value];
+  $('capacity').value = Math.round(r.capacity);
+  $('fixed').value = Math.round(r.fixed/500)*500;
+  $('variable').value = r.variable;
+  $('elasticity').value = Math.round(r.elasticity*100);
+  update();
+}
+
+function update(){
+  const r = routes[$('route').value];
+  const priceChange = Number($('priceChange').value)/100;
+  const demandFactor = Number($('demandFactor').value)/100;
+  const capacity = Number($('capacity').value);
+  const fixed = Number($('fixed').value);
+  const variable = Number($('variable').value);
+  const elasticity = Number($('elasticity').value)/100;
+
+  const basePrice = r.price;
+  const simPrice = basePrice*(1+priceChange);
+  const currentTickets = capacity*(r.occupancy/100);
+  const simTickets = Math.min(Math.max(currentTickets*demandFactor*Math.pow(simPrice/basePrice,elasticity),0),capacity);
+  const simOcc = simTickets/capacity;
+  const revenue = simTickets*simPrice;
+  const cost = fixed + simTickets*variable;
+  const margin = revenue - cost;
+  const contribution = simPrice - variable;
+  const beTickets = contribution > 0 ? fixed/contribution : Infinity;
+  const beOcc = beTickets/capacity;
+  const bePrice = simTickets > 0 ? variable + fixed/simTickets : Infinity;
+  const priceIndex = r.competitor ? simPrice/r.competitor : 1;
+
+  $('priceValue').textContent = pct(priceChange);
+  $('demandValue').textContent = pct(demandFactor);
+  $('capacityValue').textContent = Math.round(capacity)+' plazas';
+  $('fixedValue').textContent = euro.format(fixed);
+  $('variableValue').textContent = euro2.format(variable);
+  $('elasticityValue').textContent = elasticity.toFixed(2);
+
+  $('simPrice').textContent = euro2.format(simPrice);
+  $('priceContext').textContent = 'Base '+euro2.format(basePrice)+' · índice competidor '+priceIndex.toFixed(2);
+  $('simOcc').textContent = pct(simOcc);
+  $('tickets').textContent = Math.round(simTickets).toLocaleString('es-ES')+' de '+Math.round(capacity).toLocaleString('es-ES')+' plazas';
+  $('beOcc').textContent = isFinite(beOcc) ? pct(beOcc) : 'No alcanzable';
+  $('beSeats').textContent = isFinite(beTickets) ? Math.ceil(beTickets)+' pasajeros mínimos · precio mínimo '+euro2.format(bePrice) : 'El precio no cubre el coste variable';
+  $('margin').textContent = euro.format(margin);
+  $('margin').className = margin >= 0 ? 'good' : 'bad';
+  $('marginContext').textContent = euro.format(revenue)+' ingresos · '+euro.format(cost)+' coste';
+
+  const capped = Math.min(Math.max(beOcc*100,0),100);
+  $('currentLabel').textContent = (simOcc*100).toFixed(1)+'%';
+  $('thresholdLabel').textContent = isFinite(beOcc) ? (beOcc*100).toFixed(1)+'%' : 'No alcanzable';
+  $('current').style.left = (simOcc*100)+'%';
+  $('threshold').style.left = capped+'%';
+  $('zone').style.width = beOcc<=1 ? (100-capped)+'%' : '0%';
+
+  let decisionClass = 'bad';
+  let text = 'Escenario no recomendado: no alcanza el punto de equilibrio.';
+  if(margin >= 0 && simOcc >= beOcc && priceIndex <= 1.12){
+    decisionClass = 'good';
+    text = 'Escenario atractivo: supera equilibrio, mantiene una posición competitiva razonable y genera margen positivo.';
+  } else if(margin >= 0){
+    decisionClass = 'warn';
+    text = 'Escenario rentable, pero requiere revisión de ocupación, margen o posición frente al competidor.';
+  }
+  $('decision').innerHTML = `<b>Lectura ejecutiva:</b> <span class='${decisionClass}'>${text}</span><br><b>Precio mínimo para esta demanda:</b> ${isFinite(bePrice)?euro2.format(bePrice):'No calculable'} · <b>Elasticidad:</b> ${elasticity.toFixed(2)}`;
+}
+
+$('route').addEventListener('change',loadRoute);
+['priceChange','demandFactor','capacity','fixed','variable','elasticity'].forEach(id => $(id).addEventListener('input',update));
+populate(); loadRoute();
+</script>
+</body>
+</html>

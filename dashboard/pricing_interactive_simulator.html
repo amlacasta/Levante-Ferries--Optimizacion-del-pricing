@@ -1,0 +1,351 @@
+
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Levante Ferries — Pricing Simulator</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 24px;
+        background: #f6f8fb;
+        color: #1f2937;
+    }
+    .container {
+        max-width: 1100px;
+        margin: 0 auto;
+    }
+    .header {
+        margin-bottom: 18px;
+    }
+    .header h1 {
+        margin: 0 0 6px 0;
+        font-size: 28px;
+    }
+    .header p {
+        margin: 0;
+        color: #6b7280;
+    }
+    .panel {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 18px;
+        margin-bottom: 16px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+    }
+    .controls {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(180px, 1fr));
+        gap: 14px;
+    }
+    label {
+        display: block;
+        font-weight: 700;
+        font-size: 13px;
+        margin-bottom: 6px;
+    }
+    select, input[type="range"] {
+        width: 100%;
+    }
+    select {
+        padding: 9px;
+        border-radius: 10px;
+        border: 1px solid #d1d5db;
+        background: white;
+    }
+    .value {
+        font-weight: 400;
+        color: #2563eb;
+    }
+    .kpis {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+    }
+    .card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+    }
+    .card .label {
+        color: #6b7280;
+        font-size: 13px;
+        margin-bottom: 6px;
+    }
+    .card .number {
+        font-size: 26px;
+        font-weight: 800;
+        margin-bottom: 4px;
+    }
+    .card .context {
+        color: #6b7280;
+        font-size: 12px;
+    }
+    .diagnosis {
+        font-size: 15px;
+        line-height: 1.5;
+    }
+    .good {
+        color: #047857;
+        font-weight: 700;
+    }
+    .warning {
+        color: #b45309;
+        font-weight: 700;
+    }
+    .bad {
+        color: #b91c1c;
+        font-weight: 700;
+    }
+    svg {
+        width: 100%;
+        height: auto;
+        overflow: visible;
+    }
+    .grid {
+        stroke: #e5e7eb;
+        stroke-width: 1;
+    }
+    .current {
+        fill: #9ca3af;
+        opacity: 0.55;
+    }
+    .simulated {
+        fill: #2563eb;
+    }
+    .axis, .small {
+        fill: #6b7280;
+        font-size: 12px;
+    }
+    .label-text {
+        fill: #111827;
+        font-weight: 700;
+    }
+    .value-text {
+        fill: #111827;
+        font-size: 12px;
+    }
+    @media (max-width: 850px) {
+        .controls, .kpis {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Levante Ferries — Pricing Simulator</h1>
+        <p>Simulador interactivo de escenarios de precio, demanda externa y shock de coste.</p>
+    </div>
+
+    <div class="panel">
+        <div class="controls">
+            <div>
+                <label for="route">Ruta</label>
+                <select id="route"></select>
+            </div>
+            <div>
+                <label for="price">Cambio de precio: <span class="value" id="priceValue">0%</span></label>
+                <input id="price" type="range" min="-20" max="25" value="0" step="1">
+            </div>
+            <div>
+                <label for="demand">Demanda externa: <span class="value" id="demandValue">100%</span></label>
+                <input id="demand" type="range" min="75" max="130" value="100" step="1">
+            </div>
+            <div>
+                <label for="cost">Shock de coste: <span class="value" id="costValue">0%</span></label>
+                <input id="cost" type="range" min="-10" max="25" value="0" step="1">
+            </div>
+        </div>
+    </div>
+
+    <div class="kpis">
+        <div class="card">
+            <div class="label">Precio simulado</div>
+            <div class="number" id="kPrice"></div>
+            <div class="context" id="kPriceContext"></div>
+        </div>
+        <div class="card">
+            <div class="label">Ocupación esperada</div>
+            <div class="number" id="kOcc"></div>
+            <div class="context" id="kTickets"></div>
+        </div>
+        <div class="card">
+            <div class="label">Revenue por viaje</div>
+            <div class="number" id="kRevenue"></div>
+            <div class="context" id="kRevenueDelta"></div>
+        </div>
+        <div class="card">
+            <div class="label">Margen por viaje</div>
+            <div class="number" id="kMargin"></div>
+            <div class="context" id="kMarginDelta"></div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <svg id="chart" viewBox="0 0 900 270" role="img">
+            <g id="chartContent"></g>
+        </svg>
+    </div>
+
+    <div class="panel diagnosis" id="diagnosis"></div>
+</div>
+
+<script>
+const routes = {"Denia-Formentera": {"price": 76.69826027397261, "occupancy": 0.672753566964887, "capacity": 280.0, "fixed": 13200.0, "variable": 7.0, "elasticity": -0.7787842704803655, "competitor": 75.28746575342466, "currentRevenue": 14834.36098630137, "currentMargin": 304.1787945205479}, "Denia-Ibiza": {"price": 62.07955251141553, "occupancy": 0.7241814715223412, "capacity": 350.0, "fixed": 14500.0, "variable": 8.0, "elasticity": -0.8358715182808644, "competitor": 60.86378082191781, "currentRevenue": 16008.719059360732, "currentMargin": -526.795095890411}, "Denia-Mallorca": {"price": 68.50576712328767, "occupancy": 0.5340050215459892, "capacity": 520.0, "fixed": 22500.0, "variable": 10.0, "elasticity": -0.8471725680014157, "competitor": 67.1667397260274, "currentRevenue": 19277.361383561645, "currentMargin": -5995.542726027398}, "Ibiza-Mallorca": {"price": 52.33181735159817, "occupancy": 0.592034163481395, "capacity": 300.0, "fixed": 11800.0, "variable": 7.0, "elasticity": -1.0752214418289732, "competitor": 51.39736073059361, "currentRevenue": 9598.592785388128, "currentMargin": -3478.309497716895}, "Valencia-Ibiza": {"price": 74.19382191780822, "occupancy": 0.5903364351185088, "capacity": 620.0, "fixed": 25500.0, "variable": 11.0, "elasticity": -0.9541151789924197, "competitor": 72.99857534246576, "currentRevenue": 27305.142739726027, "currentMargin": -2189.575068493151}, "Valencia-Mallorca": {"price": 66.25688584474885, "occupancy": 0.5895428566019666, "capacity": 700.0, "fixed": 27500.0, "variable": 12.0, "elasticity": -1.1113700138869098, "competitor": 65.0386301369863, "currentRevenue": 27510.978785388128, "currentMargin": -4929.689707762557}};
+
+const euro = (v) => new Intl.NumberFormat("es-ES", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0
+}).format(v);
+
+const pct = (v) => new Intl.NumberFormat("es-ES", {
+    style: "percent",
+    maximumFractionDigits: 1,
+    signDisplay: "exceptZero"
+}).format(v);
+
+const q = (id) => document.getElementById(id);
+
+function drawChart(values) {
+    const max = Math.max(...values.flatMap(d => [d.current, d.simulated]), 1);
+    const x0 = 180;
+    const width = 590;
+    let html = "";
+
+    [0, 0.25, 0.50, 0.75, 1].forEach(t => {
+        const x = x0 + width * t;
+        html += `<line class="grid" x1="${x}" y1="25" x2="${x}" y2="220"></line>`;
+        html += `<text class="axis" x="${x}" y="250" text-anchor="middle">${euro(max * t)}</text>`;
+    });
+
+    values.forEach((d, i) => {
+        const y = 55 + i * 95;
+        const cw = width * d.current / max;
+        const sw = width * d.simulated / max;
+
+        html += `<text class="label-text" x="10" y="${y + 22}">${d.label}</text>`;
+        html += `<rect class="current" x="${x0}" y="${y}" width="${cw}" height="24" rx="5"></rect>`;
+        html += `<rect class="simulated" x="${x0}" y="${y + 34}" width="${sw}" height="24" rx="5"></rect>`;
+        html += `<text class="value-text" x="${Math.min(x0 + cw + 8, 850)}" y="${y + 17}">${euro(d.current)}</text>`;
+        html += `<text class="value-text" x="${Math.min(x0 + sw + 8, 850)}" y="${y + 51}">${euro(d.simulated)}</text>`;
+    });
+
+    q("chartContent").innerHTML = html;
+}
+
+function update() {
+    const routeName = q("route").value;
+    const r = routes[routeName];
+
+    const priceDelta = Number(q("price").value) / 100;
+    const demandFactor = Number(q("demand").value) / 100;
+    const costShock = Number(q("cost").value) / 100;
+
+    q("priceValue").textContent = pct(priceDelta);
+    q("demandValue").textContent = pct(demandFactor);
+    q("costValue").textContent = pct(costShock);
+
+    const currentTickets = r.capacity * r.occupancy;
+    const currentRevenue = r.currentRevenue;
+    const currentMargin = r.currentMargin;
+
+    const simulatedPrice = r.price * (1 + priceDelta);
+    const simulatedDemand = currentTickets * demandFactor * Math.pow((simulatedPrice / r.price), r.elasticity);
+    const simulatedTickets = Math.min(Math.max(simulatedDemand, 0), r.capacity);
+    const simulatedOccupancy = simulatedTickets / r.capacity;
+    const simulatedRevenue = simulatedTickets * simulatedPrice;
+
+    const simulatedCost = (r.fixed + simulatedTickets * r.variable) * (1 + costShock);
+    const simulatedMargin = simulatedRevenue - simulatedCost;
+
+    const revenueDelta = currentRevenue !== 0 ? simulatedRevenue / currentRevenue - 1 : 0;
+    const marginDelta = currentMargin !== 0 ? simulatedMargin / currentMargin - 1 : 0;
+    const priceIndex = simulatedPrice / r.competitor;
+
+    let risk = "Ocupación saludable";
+    let riskClass = "good";
+
+    if (simulatedOccupancy >= 0.95) {
+        risk = "Riesgo de saturación";
+        riskClass = "warning";
+    } else if (simulatedOccupancy >= 0.85) {
+        risk = "Ocupación alta";
+        riskClass = "good";
+    } else if (simulatedOccupancy < 0.50) {
+        risk = "Riesgo de baja ocupación";
+        riskClass = "bad";
+    } else if (simulatedOccupancy < 0.65) {
+        risk = "Demanda suave";
+        riskClass = "warning";
+    }
+
+    let recommendation = "Mantener o revisar manualmente.";
+    let recommendationClass = "warning";
+
+    if (simulatedRevenue > currentRevenue && simulatedMargin > currentMargin) {
+        recommendation = "Escenario atractivo: mejora revenue y margen.";
+        recommendationClass = "good";
+    } else if (simulatedRevenue > currentRevenue && simulatedMargin <= currentMargin) {
+        recommendation = "Mejora revenue, pero revisar impacto en margen.";
+        recommendationClass = "warning";
+    } else if (simulatedRevenue <= currentRevenue && simulatedMargin > currentMargin) {
+        recommendation = "Mejora margen, pero revisar impacto comercial.";
+        recommendationClass = "warning";
+    } else {
+        recommendation = "Escenario débil: no mejora las métricas principales.";
+        recommendationClass = "bad";
+    }
+
+    q("kPrice").textContent = euro(simulatedPrice);
+    q("kPriceContext").textContent = `Base ${euro(r.price)} · elasticidad ${r.elasticity.toFixed(2)}`;
+
+    q("kOcc").textContent = pct(simulatedOccupancy);
+    q("kTickets").textContent = `${Math.round(simulatedTickets).toLocaleString("es-ES")} de ${Math.round(r.capacity).toLocaleString("es-ES")} plazas`;
+
+    q("kRevenue").textContent = euro(simulatedRevenue);
+    q("kRevenueDelta").textContent = `${pct(revenueDelta)} vs actual`;
+
+    q("kMargin").textContent = euro(simulatedMargin);
+    q("kMarginDelta").textContent = `${pct(marginDelta)} vs actual`;
+
+    q("diagnosis").innerHTML = `
+        <p><b>Ruta:</b> ${routeName}</p>
+        <p><b>Diagnóstico de ocupación:</b> <span class="${riskClass}">${risk}</span></p>
+        <p><b>Índice frente al competidor:</b> ${priceIndex.toFixed(2)} · <b>Elasticidad:</b> ${r.elasticity.toFixed(2)}</p>
+        <p><b>Lectura ejecutiva:</b> <span class="${recommendationClass}">${recommendation}</span></p>
+    `;
+
+    drawChart([
+        {label: "Revenue", current: currentRevenue, simulated: simulatedRevenue},
+        {label: "Margen", current: currentMargin, simulated: simulatedMargin}
+    ]);
+}
+
+function initialize() {
+    const routeSelect = q("route");
+    Object.keys(routes).sort().forEach(route => {
+        const option = document.createElement("option");
+        option.value = route;
+        option.textContent = route;
+        routeSelect.appendChild(option);
+    });
+
+    ["route", "price", "demand", "cost"].forEach(id => {
+        q(id).addEventListener("input", update);
+    });
+
+    update();
+}
+
+initialize();
+</script>
+</body>
+</html>
