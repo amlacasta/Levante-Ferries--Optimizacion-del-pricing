@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Environments
+.env
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large / generated files
+models/*.joblib
+data/raw/*.csv
+data/processed/*.csv
+
+# Optional generated reports
+reports/*.xlsx
+reports/*_excel_es.csv
+
+# Keep folders
+!.gitkeep
