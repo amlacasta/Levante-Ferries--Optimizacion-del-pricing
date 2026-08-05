@@ -386,9 +386,8 @@ Posibles ampliaciones:
 
 ---
 
-## 13. Cómo explicar este proyecto en entrevista
+## 13. Explicación del proyecto
 
-Una forma clara de explicarlo:
 
 > Construí un proyecto completo de revenue management aplicado a rutas de ferry. Primero generé un dataset sintético con lógica de negocio, después analicé revenue, ocupación y margen, estimé elasticidad precio-demanda, entrené un modelo predictivo de demanda, simulé escenarios de precio y finalmente creé un recomendador formal explicable. El resultado final es un dashboard ejecutivo que permite ver qué rutas deberían subir precio, mantener, promocionar o revisar manualmente.
 
